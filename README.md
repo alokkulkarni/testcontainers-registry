@@ -11,6 +11,7 @@ This repository contains custom Docker images for TestContainers used in integra
 | IBM MQ | ibm-messaging/mq:latest | amd64 | `latest`, `9.3` |
 | Kafka | confluentinc/cp-kafka:7.6.0 | amd64, arm64 | `latest`, `7.6`, `7.6.0` |
 | DB2 | db2_community/db2:11.5.9.0 | amd64 | `latest`, `11.5`, `11.5.9` |
+| Oracle XE | oracle/database:21.3.0-xe | amd64 | `latest`, `21`, `21.3`, `21.3.0` |
 
 ## Structure
 
@@ -29,12 +30,20 @@ testcontainers-registry/
 │   ├── Dockerfile
 │   ├── create-topics.sh
 │   └── README.md
-├── db2/
+├── DB2/
+│   ├── Dockerfile
+│   └── README.md
+├── Oracle/
 │   ├── Dockerfile
 │   └── README.md
 └── .github/
     └── workflows/
-        └── build-and-push.yaml
+        ├── build-postgres.yaml
+        ├── build-redis.yaml
+        ├── build-ibmmq.yaml
+        ├── build-kafka.yaml
+        ├── build-db2.yaml
+        └── build-oracle.yaml
 ```
 
 ## Using Pre-built Images
@@ -56,6 +65,9 @@ docker pull ghcr.io/alokkulkarni/testcontainers-registry/testcontainers/kafka:la
 
 # DB2
 docker pull ghcr.io/alokkulkarni/testcontainers-registry/testcontainers/db2:latest
+
+# Oracle XE
+docker pull ghcr.io/alokkulkarni/testcontainers-registry/testcontainers/oracle-xe:latest
 ```
 
 ## Building Images Locally
@@ -86,8 +98,14 @@ docker build -t testcontainers-kafka:latest .
 
 ### DB2
 ```bash
-cd db2
+cd DB2
 docker build -t testcontainers-db2:latest .
+```
+
+### Oracle XE
+```bash
+cd Oracle
+docker build -t testcontainers-oracle-xe:latest .
 ```
 
 ## Usage in Tests
@@ -155,6 +173,25 @@ static void db2Properties(DynamicPropertyRegistry registry) {
 }
 ```
 
+### Oracle XE
+```java
+import org.testcontainers.containers.OracleContainer;
+import org.testcontainers.utility.DockerImageName;
+
+@Container
+private static final OracleContainer oracleContainer = new OracleContainer(
+    DockerImageName.parse("ghcr.io/alokkulkarni/testcontainers-registry/testcontainers/oracle-xe:latest")
+        .asCompatibleSubstituteFor("gvenzl/oracle-xe")
+).withReuse(true);
+
+@DynamicPropertySource
+static void oracleProperties(DynamicPropertyRegistry registry) {
+    registry.add("spring.datasource.url", oracleContainer::getJdbcUrl);
+    registry.add("spring.datasource.username", oracleContainer::getUsername);
+    registry.add("spring.datasource.password", oracleContainer::getPassword);
+}
+```
+
 ## Configuration
 
 ### PostgreSQL
@@ -195,7 +232,17 @@ static void db2Properties(DynamicPropertyRegistry registry) {
 - Password: `password`
 - JDBC URL: `jdbc:db2://localhost:50000/testdb`
 - Requires: `--privileged` mode
-- See [db2/README.md](db2/README.md) for detailed configuration
+- See [DB2/README.md](DB2/README.md) for detailed configuration
+
+### Oracle XE
+- Port: `1521` (Database), `5500` (EM Express)
+- SID: `XE`
+- Service Name: `XEPDB1` (Pluggable Database)
+- Username: `system`
+- Password: `oracle`
+- JDBC URL: `jdbc:oracle:thin:@localhost:1521/XEPDB1`
+- Requires: `--shm-size=1g` minimum
+- See [Oracle/README.md](Oracle/README.md) for detailed configuration
 
 ## Health Checks
 
@@ -205,20 +252,34 @@ All containers include health checks:
 - **IBM MQ**: Checks `dspmq` (queue manager running) every 10 seconds
 - **Kafka**: Checks `kafka-broker-api-versions` every 10 seconds
 - **DB2**: Checks `db2 connect to testdb` every 30 seconds
+- **Oracle XE**: Checks `sqlplus` connection every 30 seconds
 
 ## CI/CD
 
-Images are automatically built and pushed to GitHub Container Registry on:
+Each image has its own dedicated GitHub Actions workflow that builds and pushes to GitHub Container Registry:
+
+- **PostgreSQL**: `.github/workflows/build-postgres.yaml`
+- **Redis**: `.github/workflows/build-redis.yaml`
+- **IBM MQ**: `.github/workflows/build-ibmmq.yaml`
+- **Kafka**: `.github/workflows/build-kafka.yaml`
+- **DB2**: `.github/workflows/build-db2.yaml`
+- **Oracle XE**: `.github/workflows/build-oracle.yaml`
+
+Workflows are triggered on:
 - Push to `main` branch (when files in respective directories change)
+- Pull requests to `main` branch
 - Manual workflow dispatch
 
 ### Workflow Triggers
-- Changes to `postgres/**`
-- Changes to `redis/**`
-- Changes to `IBMMQ/**`
-- Changes to `kafka/**`
-- Changes to `db2/**`
-- Changes to `.github/workflows/build-and-push.yaml`
+
+Each workflow is triggered independently by changes to its specific directory:
+
+- **PostgreSQL**: Changes to `postgres/**` or `.github/workflows/build-postgres.yaml`
+- **Redis**: Changes to `redis/**` or `.github/workflows/build-redis.yaml`
+- **IBM MQ**: Changes to `IBMMQ/**` or `.github/workflows/build-ibmmq.yaml`
+- **Kafka**: Changes to `kafka/**` or `.github/workflows/build-kafka.yaml`
+- **DB2**: Changes to `DB2/**` or `.github/workflows/build-db2.yaml`
+- **Oracle XE**: Changes to `Oracle/**` or `.github/workflows/build-oracle.yaml`
 
 ### Image Tags
 Images are tagged with:
@@ -237,6 +298,10 @@ Images are tagged with:
 - **DB2**: Uses IBM DB2 Community Edition
   - Free for development and testing
   - Production use requires appropriate IBM DB2 licenses
+- **Oracle XE**: Uses Oracle Database Express Edition
+  - Free for development, testing, prototyping, and demonstrating applications
+  - Production use requires appropriate Oracle Database licenses
+  - Subject to Oracle Technology Network License Agreement
 
 ## Contributing
 
@@ -244,5 +309,5 @@ When adding new container images:
 1. Create a new directory with the service name
 2. Add a `Dockerfile` and any required configuration files
 3. Add a `README.md` with usage instructions
-4. Update the workflow in `.github/workflows/build-and-push.yaml`
+4. Create a dedicated workflow in `.github/workflows/build-<service>.yaml`
 5. Update this main README.md
