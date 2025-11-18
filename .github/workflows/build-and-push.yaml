@@ -6,18 +6,21 @@ on:
     paths:
       - "postgres/**"
       - "redis/**"
+      - "IBMMQ/**"
       - ".github/workflows/build-and-push.yaml"
   pull_request:
     branches: [main]
     paths:
       - "postgres/**"
       - "redis/**"
+      - "IBMMQ/**"
   workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
   POSTGRES_IMAGE_NAME: ${{ github.repository }}/testcontainers/postgres
   REDIS_IMAGE_NAME: ${{ github.repository }}/testcontainers/redis
+  IBMMQ_IMAGE_NAME: ${{ github.repository }}/testcontainers/ibmmq
 
 jobs:
   build-and-push:
@@ -84,6 +87,27 @@ jobs:
           cache-to: type=gha,mode=max
           platforms: linux/amd64,linux/arm64
 
+      - name: Extract metadata for IBM MQ
+        id: meta-ibmmq
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IBMMQ_IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest
+            type=raw,value=9.3
+            type=sha,prefix=9.3-
+
+      - name: Build and push IBM MQ image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./IBMMQ
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta-ibmmq.outputs.tags }}
+          labels: ${{ steps.meta-ibmmq.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
+
       - name: Image digest summary
         run: |
           echo "### Docker Images Published :rocket:" >> $GITHUB_STEP_SUMMARY
@@ -96,4 +120,9 @@ jobs:
           echo "**Redis Images:**" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
           echo "${{ steps.meta-redis.outputs.tags }}" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**IBM MQ Images:**" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.meta-ibmmq.outputs.tags }}" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
