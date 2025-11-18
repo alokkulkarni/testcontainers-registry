@@ -10,6 +10,7 @@ This repository contains custom Docker images for TestContainers used in integra
 | Redis | redis:7-alpine | amd64, arm64 | `latest`, `7`, `7-alpine` |
 | IBM MQ | ibm-messaging/mq:latest | amd64 | `latest`, `9.3` |
 | Kafka | confluentinc/cp-kafka:7.6.0 | amd64, arm64 | `latest`, `7.6`, `7.6.0` |
+| DB2 | db2_community/db2:11.5.9.0 | amd64 | `latest`, `11.5`, `11.5.9` |
 
 ## Structure
 
@@ -27,6 +28,9 @@ testcontainers-registry/
 ├── kafka/
 │   ├── Dockerfile
 │   ├── create-topics.sh
+│   └── README.md
+├── db2/
+│   ├── Dockerfile
 │   └── README.md
 └── .github/
     └── workflows/
@@ -49,6 +53,9 @@ docker pull ghcr.io/alokkulkarni/testcontainers-registry/testcontainers/ibmmq:la
 
 # Kafka
 docker pull ghcr.io/alokkulkarni/testcontainers-registry/testcontainers/kafka:latest
+
+# DB2
+docker pull ghcr.io/alokkulkarni/testcontainers-registry/testcontainers/db2:latest
 ```
 
 ## Building Images Locally
@@ -75,6 +82,12 @@ docker build -t testcontainers-ibmmq:latest .
 ```bash
 cd kafka
 docker build -t testcontainers-kafka:latest .
+```
+
+### DB2
+```bash
+cd db2
+docker build -t testcontainers-db2:latest .
 ```
 
 ## Usage in Tests
@@ -123,6 +136,25 @@ static void kafkaProperties(DynamicPropertyRegistry registry) {
 }
 ```
 
+### DB2
+```java
+import org.testcontainers.containers.Db2Container;
+import org.testcontainers.utility.DockerImageName;
+
+@Container
+private static final Db2Container db2Container = new Db2Container(
+    DockerImageName.parse("ghcr.io/alokkulkarni/testcontainers-registry/testcontainers/db2:latest")
+        .asCompatibleSubstituteFor("ibmcom/db2")
+).acceptLicense();
+
+@DynamicPropertySource
+static void db2Properties(DynamicPropertyRegistry registry) {
+    registry.add("spring.datasource.url", db2Container::getJdbcUrl);
+    registry.add("spring.datasource.username", db2Container::getUsername);
+    registry.add("spring.datasource.password", db2Container::getPassword);
+}
+```
+
 ## Configuration
 
 ### PostgreSQL
@@ -155,6 +187,16 @@ static void kafkaProperties(DynamicPropertyRegistry registry) {
 - Replication Factor: 1 (single node)
 - See [kafka/README.md](kafka/README.md) for detailed configuration
 
+### DB2
+- Port: `50000` (Database)
+- Instance: `db2inst1`
+- Database: `testdb`
+- Username: `db2inst1`
+- Password: `password`
+- JDBC URL: `jdbc:db2://localhost:50000/testdb`
+- Requires: `--privileged` mode
+- See [db2/README.md](db2/README.md) for detailed configuration
+
 ## Health Checks
 
 All containers include health checks:
@@ -162,6 +204,7 @@ All containers include health checks:
 - **Redis**: Checks `redis-cli ping` every 10 seconds
 - **IBM MQ**: Checks `dspmq` (queue manager running) every 10 seconds
 - **Kafka**: Checks `kafka-broker-api-versions` every 10 seconds
+- **DB2**: Checks `db2 connect to testdb` every 30 seconds
 
 ## CI/CD
 
@@ -174,6 +217,7 @@ Images are automatically built and pushed to GitHub Container Registry on:
 - Changes to `redis/**`
 - Changes to `IBMMQ/**`
 - Changes to `kafka/**`
+- Changes to `db2/**`
 - Changes to `.github/workflows/build-and-push.yaml`
 
 ### Image Tags
@@ -190,6 +234,9 @@ Images are tagged with:
   - Free for development and testing
   - Production use requires appropriate IBM MQ licenses
 - **Kafka**: Apache License 2.0 (using Confluent's distribution)
+- **DB2**: Uses IBM DB2 Community Edition
+  - Free for development and testing
+  - Production use requires appropriate IBM DB2 licenses
 
 ## Contributing
 

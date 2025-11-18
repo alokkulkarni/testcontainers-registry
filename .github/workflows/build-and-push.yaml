@@ -8,6 +8,7 @@ on:
       - "redis/**"
       - "IBMMQ/**"
       - "kafka/**"
+      - "db2/**"
       - ".github/workflows/build-and-push.yaml"
   pull_request:
     branches: [main]
@@ -16,6 +17,7 @@ on:
       - "redis/**"
       - "IBMMQ/**"
       - "kafka/**"
+      - "db2/**"
   workflow_dispatch:
 
 env:
@@ -24,6 +26,7 @@ env:
   REDIS_IMAGE_NAME: ${{ github.repository }}/testcontainers/redis
   IBMMQ_IMAGE_NAME: ${{ github.repository }}/testcontainers/ibmmq
   KAFKA_IMAGE_NAME: ${{ github.repository }}/testcontainers/kafka
+  DB2_IMAGE_NAME: ${{ github.repository }}/testcontainers/db2
 
 jobs:
   build-and-push:
@@ -133,6 +136,28 @@ jobs:
           cache-to: type=gha,mode=max
           platforms: linux/amd64,linux/arm64
 
+      - name: Extract metadata for DB2
+        id: meta-db2
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.DB2_IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest
+            type=raw,value=11.5
+            type=raw,value=11.5.9
+            type=sha,prefix=11.5-
+
+      - name: Build and push DB2 image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./db2
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta-db2.outputs.tags }}
+          labels: ${{ steps.meta-db2.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64
+
       - name: Image digest summary
         run: |
           echo "### Docker Images Published :rocket:" >> $GITHUB_STEP_SUMMARY
@@ -155,4 +180,9 @@ jobs:
           echo "**Kafka Images:**" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
           echo "${{ steps.meta-kafka.outputs.tags }}" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**DB2 Images:**" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.meta-db2.outputs.tags }}" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
