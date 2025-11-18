@@ -9,6 +9,7 @@ This repository contains custom Docker images for TestContainers used in integra
 | PostgreSQL | postgres:16-alpine | amd64, arm64 | `latest`, `16`, `16-alpine` |
 | Redis | redis:7-alpine | amd64, arm64 | `latest`, `7`, `7-alpine` |
 | IBM MQ | ibm-messaging/mq:latest | amd64 | `latest`, `9.3` |
+| Kafka | confluentinc/cp-kafka:7.6.0 | amd64, arm64 | `latest`, `7.6`, `7.6.0` |
 
 ## Structure
 
@@ -22,6 +23,10 @@ testcontainers-registry/
 ├── IBMMQ/
 │   ├── Dockerfile
 │   ├── 20-config.mqsc
+│   └── README.md
+├── kafka/
+│   ├── Dockerfile
+│   ├── create-topics.sh
 │   └── README.md
 └── .github/
     └── workflows/
@@ -41,6 +46,9 @@ docker pull ghcr.io/alokkulkarni/testcontainers-registry/testcontainers/redis:la
 
 # IBM MQ
 docker pull ghcr.io/alokkulkarni/testcontainers-registry/testcontainers/ibmmq:latest
+
+# Kafka
+docker pull ghcr.io/alokkulkarni/testcontainers-registry/testcontainers/kafka:latest
 ```
 
 ## Building Images Locally
@@ -61,6 +69,12 @@ docker build -t testcontainers-redis:7-alpine .
 ```bash
 cd IBMMQ
 docker build -t testcontainers-ibmmq:latest .
+```
+
+### Kafka
+```bash
+cd kafka
+docker build -t testcontainers-kafka:latest .
 ```
 
 ## Usage in Tests
@@ -93,6 +107,22 @@ private static final GenericContainer<?> ibmMqContainer = new GenericContainer<>
     .withStartupTimeout(Duration.ofMinutes(2));
 ```
 
+### Kafka
+```java
+import org.testcontainers.kafka.KafkaContainer;
+import org.testcontainers.utility.DockerImageName;
+
+@Container
+private static final KafkaContainer kafkaContainer = new KafkaContainer(
+    DockerImageName.parse("ghcr.io/alokkulkarni/testcontainers-registry/testcontainers/kafka:latest")
+);
+
+@DynamicPropertySource
+static void kafkaProperties(DynamicPropertyRegistry registry) {
+    registry.add("spring.kafka.bootstrap-servers", kafkaContainer::getBootstrapServers);
+}
+```
+
 ## Configuration
 
 ### PostgreSQL
@@ -117,12 +147,21 @@ private static final GenericContainer<?> ibmMqContainer = new GenericContainer<>
 - Credentials: `admin/passw0rd`, `app/passw0rd`
 - See [IBMMQ/README.md](IBMMQ/README.md) for detailed configuration
 
+### Kafka
+- Port: `9092` (Kafka Broker)
+- Mode: KRaft (no Zookeeper required)
+- Auto-create Topics: Enabled
+- Pre-configured Topics: `test-topic`, `payment-events`, `notification-events`
+- Replication Factor: 1 (single node)
+- See [kafka/README.md](kafka/README.md) for detailed configuration
+
 ## Health Checks
 
 All containers include health checks:
 - **PostgreSQL**: Checks `pg_isready` every 10 seconds
 - **Redis**: Checks `redis-cli ping` every 10 seconds
 - **IBM MQ**: Checks `dspmq` (queue manager running) every 10 seconds
+- **Kafka**: Checks `kafka-broker-api-versions` every 10 seconds
 
 ## CI/CD
 
@@ -134,6 +173,7 @@ Images are automatically built and pushed to GitHub Container Registry on:
 - Changes to `postgres/**`
 - Changes to `redis/**`
 - Changes to `IBMMQ/**`
+- Changes to `kafka/**`
 - Changes to `.github/workflows/build-and-push.yaml`
 
 ### Image Tags
@@ -149,6 +189,7 @@ Images are tagged with:
 - **IBM MQ**: Uses IBM MQ Developer Edition under IBM International License Agreement for Non-Warranted Programs
   - Free for development and testing
   - Production use requires appropriate IBM MQ licenses
+- **Kafka**: Apache License 2.0 (using Confluent's distribution)
 
 ## Contributing
 

@@ -7,6 +7,7 @@ on:
       - "postgres/**"
       - "redis/**"
       - "IBMMQ/**"
+      - "kafka/**"
       - ".github/workflows/build-and-push.yaml"
   pull_request:
     branches: [main]
@@ -14,6 +15,7 @@ on:
       - "postgres/**"
       - "redis/**"
       - "IBMMQ/**"
+      - "kafka/**"
   workflow_dispatch:
 
 env:
@@ -21,6 +23,7 @@ env:
   POSTGRES_IMAGE_NAME: ${{ github.repository }}/testcontainers/postgres
   REDIS_IMAGE_NAME: ${{ github.repository }}/testcontainers/redis
   IBMMQ_IMAGE_NAME: ${{ github.repository }}/testcontainers/ibmmq
+  KAFKA_IMAGE_NAME: ${{ github.repository }}/testcontainers/kafka
 
 jobs:
   build-and-push:
@@ -108,6 +111,28 @@ jobs:
           cache-to: type=gha,mode=max
           platforms: linux/amd64
 
+      - name: Extract metadata for Kafka
+        id: meta-kafka
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.KAFKA_IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest
+            type=raw,value=7.6
+            type=raw,value=7.6.0
+            type=sha,prefix=7.6-
+
+      - name: Build and push Kafka image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./kafka
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta-kafka.outputs.tags }}
+          labels: ${{ steps.meta-kafka.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
+
       - name: Image digest summary
         run: |
           echo "### Docker Images Published :rocket:" >> $GITHUB_STEP_SUMMARY
@@ -125,4 +150,9 @@ jobs:
           echo "**IBM MQ Images:**" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
           echo "${{ steps.meta-ibmmq.outputs.tags }}" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Kafka Images:**" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.meta-kafka.outputs.tags }}" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
