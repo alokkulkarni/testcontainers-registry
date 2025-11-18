@@ -25,9 +25,8 @@ ENV KAFKA_NODE_ID=1 \
 # Create topics directory for pre-configured topics
 RUN mkdir -p /etc/kafka/topics
 
-# Copy topic creation script
-COPY create-topics.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/create-topics.sh
+# Copy topic creation script with execute permissions
+COPY --chmod=0755 create-topics.sh /usr/local/bin/
 
 # Expose Kafka ports
 # 9092 - Kafka broker (PLAINTEXT)
